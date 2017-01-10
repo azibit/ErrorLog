@@ -1,0 +1,65 @@
+import org.gradle.api.artifacts.*
+
+apply plugin: 'base' // To add "clean" task to the root project.
+apply plugin: 'java' 
+apply plugin: 'war' 
+
+subprojects {
+    apply from: rootProject.file('common.gradle')
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+task mergedJavadoc(type: Javadoc, description: 'Creates Javadoc from all the projects.') {
+    title = 'All modules'
+    destinationDir = new File(project.buildDir, 'merged-javadoc')
+
+    // Note: The closures below are executed lazily.
+    source {
+        subprojects*.sourceSets*.main*.allSource
+    }
+    classpath.from {
+        subprojects*.configurations*.compile*.copyRecursive({ !(it instanceof ProjectDependency); })*.resolve()
+    }
+}
+
+configurations {
+    compile
+    provided
+}
+
+dependencies{
+    compile group: "javax", name: "javaee-api", version: "7.0"
+    compile 'javax.servlet:javax.servlet-api:3.1.0'
+    compile group: "javax.validation", name: "validation-api", version: "1.0.0.GA"
+    compile 'javax.ws.rs:javax.ws.rs-api:2.0.1'
+    compile 'org.glassfish.jersey.media:jersey-media-json-jackson:2.6'
+    compile 'org.glassfish.jersey.media:jersey-media-multipart:2.6'
+    compile 'org.glassfish.jersey.media:jersey-media-json-processing:2.6'
+    compile 'org.glassfish.jersey.core:jersey-client:2.6'
+    compile('org.glassfish.jersey.containers:jersey-container-servlet:2.6') {
+        exclude group: "com.sun.jersey", module: "jersey-core"
+    }
+    compile group: 'org.glassfish.jersey.media', name: 'jersey-media-moxy', version: '2.25'
+    // https://mvnrepository.com/artifact/org.codehaus.jackson/jackson-mapper-asl
+    compile group: 'org.codehaus.jackson', name: 'jackson-mapper-asl', version: '1.9.13'
+
+
+
+}
+
+
+task deploy(dependsOn: 'war', type:Exec) {
+    workingDir "${glassfishHome}${File.separator}bin"
+
+    if (System.properties['os.name'].toLowerCase().contains('windows')) {
+        commandLine 'cmd', '/c', 'asadmin.bat'
+    } else {
+        commandLine "./asadmin"
+    }
+
+    args "deploy", "--force=true", "${war.archivePath}"
+}
